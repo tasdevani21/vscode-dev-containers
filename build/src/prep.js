@@ -216,16 +216,25 @@ async function updateAllScriptSourcesInRepo(repo, release, updateScriptSha) {
 // Copy contents of script library to folder 
 async function copyLibraryScriptsForDefinition(definitionDevContainerJsonFolder) {
     const libraryScriptsFolder = path.join(definitionDevContainerJsonFolder, scriptLibraryFolderNameInDefinition);
-    if (await asyncUtils.exists(libraryScriptsFolder)) {
-        await asyncUtils.forEach(await asyncUtils.readdir(libraryScriptsFolder), async (script) => {
+    const scriptLibraryFolder = path.join(__dirname, '..', '..', scriptLibraryPathInRepo);
+    const testProjectFolder = path.join(definitionDevContainerJsonFolder, '..', 'test-project');
+    const scriptLibraryTestProjectFolder = path.join(__dirname, '..', '..', scriptLibraryPathInRepo, 'test', 'test-project');
+    await replaceFilesThatExist(scriptLibraryFolder, libraryScriptsFolder);
+    await replaceFilesThatExist(scriptLibraryTestProjectFolder, testProjectFolder);
+}
+
+// Utility function used to copy script-library and script-library/test/test-project contents
+async function replaceFilesThatExist(sourceFolder, targetFolder) {
+    if (await asyncUtils.exists(targetFolder)) {
+        await asyncUtils.forEach(await asyncUtils.readdir(targetFolder), async (script) => {
             // Only copy files that end in .sh
             if (path.extname(script) !== '.sh') {
                 return;
             }
-            const possibleScriptSource = path.join(__dirname, '..', '..', scriptLibraryPathInRepo, script);
+            const possibleScriptSource = path.join(sourceFolder, script);
             if (await asyncUtils.exists(possibleScriptSource)) {
-                const targetScriptPath = path.join(libraryScriptsFolder, script);
-                console.log(`(*) Copying ${script} to ${libraryScriptsFolder}...`);
+                const targetScriptPath = path.join(targetFolder, script);
+                console.log(`(*) Copying ${script} to ${targetFolder}...`);
                 await asyncUtils.copyFile(possibleScriptSource, targetScriptPath);
             }
         });

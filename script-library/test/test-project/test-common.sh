@@ -1,7 +1,7 @@
 #!/bin/bash
-set -e
-
 cd $(dirname "$0")
+
+set -e
 
 USERNAME=${1:-"$(whoami)"}
 
@@ -100,8 +100,9 @@ check "code" bash -i -c "code --version"
 
 # Report result
 if [ ${#FAILED[@]} -ne 0 ]; then
-    echo "Failed in $(basename $0): ${FAILED[@]}" >> test_report.txt
+    echo -e "\n💥  Failed common tests: ${FAILED[@]}"
     exit 1
 else 
+    echo -e "\n💯  All common tests passed!"
     exit 0
 fi
