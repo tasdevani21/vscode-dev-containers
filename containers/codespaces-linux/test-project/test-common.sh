@@ -1,9 +1,8 @@
 #!/bin/bash
-set -e
-
 cd $(dirname "$0")
-
-USERNAME=${1:-"$(whoami)"}
+VS_CODE_SERVER_TESTS="${1:-true}"
+USERNAME=${2:-"$(whoami)"}
+RESULTS_LOG=${3:-"test-results.log"}
 
 if [ -z $HOME ]; then
     HOME="/root"
@@ -16,10 +15,20 @@ check() {
     shift
     echo -e "\n🧪  Testing $LABEL: $@"
     if "$@"; then 
-        echo "🏆  Passed!"
+        echo "✅  Passed!"
     else
-        echo "💥  $LABEL check failed."
+        echo "❌  $LABEL check failed."
         FAILED+=("$LABEL")
+    fi
+}
+
+ifVSCodeServerTestsEnabled() {
+    if [ "${VS_CODE_SERVER_TESTS}" = "true" ]; then
+        "$@"
+    else
+        shift
+        LABEL=$1
+        echo -e "\n🤷  Skipping test $LABEL - VS Code Server tests disabled."
     fi
 }
 
@@ -33,16 +42,6 @@ checkMultiple() {
         shift; EXPRESSION=$1
     done
     check "$LABEL" [ $PASSED -ge $MINIMUMPASSED ]
-}
-
-checkOSPackages() {
-    LABEL="$1"
-    shift
-    check "$LABEL" dpkg-query --show -f='${Package}: ${Version}\n' "$@"
-}
-
-checkExtension() {
-    checkMultiple "$1" 1 "[ -d ""$HOME/.vscode-server/extensions/$1*"" ]" "[ -d ""$HOME/.vscode-server-insiders/extensions/$1*"" ]" "[ -d ""$HOME/.vscode-test-server/extensions/$1*"" ]" "[ -d ""$HOME/.vscode-remote/extensions/$1*"" ]"
 }
 
 # Settings
@@ -81,27 +80,21 @@ PACKAGE_LIST="apt-utils \
     ncdu \
     man-db"
 
-if [ ${USERNAME} != 'root' ]; then
-    HOME_FOLDER="/root"
-else
-    HOME_FOLDER="/home/${USERNAME}"
-fi
-
 # Actual tests
-checkOSPackages "common-os-packages" ${PACKAGE_LIST}
-checkMultiple "vscode-server" 1 "[ -d ""$HOME/.vscode-server/bin"" ]" "[ -d ""$HOME/.vscode-server-insiders/bin"" ]" "[ -d ""$HOME/.vscode-test-server/bin"" ]" "[ -d ""$HOME/.vscode-remote/bin"" ]" "[ -d ""$HOME/.vscode-remote/bin"" ]"
-check "${HOME_FOLDER} exists" [ -d "${HOME_FOLDER}" ]
+check "common-os-packages" ./check-os-packages.sh ${PACKAGE_LIST}
+ifVSCodeServerTestsEnabled checkMultiple "vscode-server" 1 "[ -d ""$HOME/.vscode-server/bin"" ]" "[ -d ""$HOME/.vscode-server-insiders/bin"" ]" "[ -d ""$HOME/.vscode-test-server/bin"" ]" "[ -d ""$HOME/.vscode-remote/bin"" ]" "[ -d ""$HOME/.vscode-remote/bin"" ]"
 check "locale" [ $(locale -a | grep en_US.utf8) ]
 check "sudo" sudo echo "sudo works."
 check "oh-my-bash" [ -d "$HOME/.oh-my-bash" ]
-check "zsh" zsh --version
 check "oh-my-zsh" [ -d "$HOME/.oh-my-zsh" ]
-check "code" bash -i -c "code --version"
+check "zsh" zsh --version
+ifVSCodeServerTestsEnabled check "code" bash -li -c "code --version"
 
 # Report result
-if [ ${#FAILED[@]} -ne 0 ]; then
-    echo "Failed in $(basename $0): ${FAILED[@]}" >> test_report.txt
+if [ "${#FAILED[@]}" -ne "0" ]; then
+    echo -e "(!) $(basename $0) - Failed: ${FAILED[@]}" >> "${RESULTS_LOG}"
     exit 1
 else 
+    echo -e "(*) $(basename $0) - All passed!" >> "${RESULTS_LOG}"
     exit 0
 fi

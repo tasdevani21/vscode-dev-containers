@@ -1,7 +1,8 @@
 #!/bin/bash
-set -e
-
 cd $(dirname "$0")
+VS_CODE_SERVER_TESTS="${1:-true}"
+USERNAME=${2:-"$(whoami)"}
+RESULTS_LOG=${3:-"test-results.log"}
 
 if [ -z $HOME ]; then
     HOME="/root"
@@ -14,10 +15,20 @@ check() {
     shift
     echo -e "\n🧪  Testing $LABEL: $@"
     if "$@"; then 
-        echo "🏆  Passed!"
+        echo "✅  Passed!"
     else
-        echo "💥  $LABEL check failed."
+        echo "❌  $LABEL check failed."
         FAILED+=("$LABEL")
+    fi
+}
+
+ifVSCodeServerTestsEnabled() {
+    if [ "${VS_CODE_SERVER_TESTS}" = "true" ]; then
+        "$@"
+    else
+        shift
+        LABEL=$1
+        echo -e "\n🤷  Skipping test $LABEL - VS Code Server tests disabled."
     fi
 }
 
@@ -45,20 +56,20 @@ check "virtualenv" virtualenv --version
 
 # Check Java tools
 check "java" java --version
-check "sdkman" sdk --version
+check "sdkman" bash -li -c "sdk --version"
 check "gradle" gradle --version
 check "maven" mvn --version
 
 # Check Ruby tools
 check "ruby" ruby --version
 check "rake" rake --version
-check "rvm" bash -i -c 'rvm --version'
-check "rbenv" bash -i -c 'rbenv --version'
+check "rvm" bash -li -c "rvm --version"
+check "rbenv" bash -li -c "rbenv --version"
 
 # Node.js
 check "node" node --version
-check "nvm" bash -i -c 'nvm --version'
-check "nvs" bash -i -c 'nvs --version'
+check "nvm" bash -li -c "nvm --version"
+check "nvs" bash -li -c "nvs --version"
 check "yarn" yarn --version
 check "npm" npm --version
 
@@ -87,16 +98,17 @@ check "bash" bash --version
 check "fish" fish --version
 check "zsh" zsh --version
 
-# Check expected commands
-check "git-ed" test "$(cat $(which git-ed.sh))" = "$(cat ./git-ed-expected.txt)"
+# Check expected git editor command is available
+check "git-ed" bash -li -c '[ -f "$(which git-ed.sh)" ] && [ "$(cat $(which git-ed.sh))" = "$(cat ./git-ed-expected.txt)" ]'
 
 # Check extensions
-check "GitHub.vscode-pull-request-github" ./check-extension.sh "GitHub.vscode-pull-request-github"
+check "gitHub.vscode-pull-request-github" ./check-extension.sh "gitHub.vscode-pull-request-github"
 
-# -- Report results --
-if [ ${#FAILED[@]} -ne 0 ]; then
-    echo "Failed in $(basename $0): ${FAILED[@]}" >> test_report.txt
+# Report result
+if [ "${#FAILED[@]}" -ne "0" ]; then
+    echo -e "(!) $(basename $0) - Failed: ${FAILED[@]}" >> "${RESULTS_LOG}"
     exit 1
 else 
+    echo -e "(*) $(basename $0) - All passed!" >> "${RESULTS_LOG}"
     exit 0
 fi
