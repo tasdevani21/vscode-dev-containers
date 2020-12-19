@@ -14,6 +14,11 @@ fi
 
 FAILED=()
 
+echoStderr()
+{
+    echo "$@" 1>&2
+}
+
 check() {
     LABEL=$1
     shift
@@ -22,7 +27,7 @@ check() {
         echo "✅  Passed!"
         return 0
     else
-        echo "❌ $LABEL check failed."
+        echoStderr "❌ $LABEL check failed."
         FAILED+=("$LABEL")
         return 1
     fi
@@ -42,7 +47,7 @@ checkMultiple() {
         echo "✅ Passed!"
         return 0
     else
-        echo "❌ $LABEL check failed."
+        echoStderr "❌ $LABEL check failed."
         FAILED+=("$LABEL")
         return 1
     fi
@@ -62,7 +67,7 @@ checkOSPackages() {
         echo "✅  Passed!"
         return 0
     else
-        echo "❌ $LABEL check failed."
+        echoStderr "❌ $LABEL check failed."
         FAILED+=("$LABEL")
         return 1
     fi
@@ -200,7 +205,7 @@ checkCommon()
 
 reportResults() {
     if [ ${#FAILED[@]} -ne 0 ]; then
-        echo -e "\n💥  Failed tests: ${FAILED[@]}"
+        echoStderr -e "\n💥  Failed tests: ${FAILED[@]}"
         exit 1
     else 
         echo -e "\n💯  All passed!"
