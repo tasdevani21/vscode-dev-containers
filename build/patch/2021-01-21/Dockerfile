@@ -15,21 +15,33 @@ krb5-3 \
 openldap \
 libgssapi-krb5-2 \
 tzdata \
-moby-cli \
-moby-engine \
 "
 
-RUN sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "\$@"; else "\$@"; fi } \
+ARG PATCH_SCRIPT="\
+    export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && echo \"${PACKAGE_LIST}\" | tr ' ' '\n' | while read PKG; do \
+        echo \"Checking \$PKG...\" \
+        && if [ \"\$PKG\" != '' ] && dpkg -s \$PKG >/dev/null 2>&1; then apt-get install -yq --only-upgrade \$PKG; fi; \
+    done \
+    && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/* \
     && if type go > /dev/null 2>&1; then \
-        GOVERSION="$(go version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" \
-    fi \
-    && sudoIf apt-get update \
-    && sudoIf bash -c "\
-        export DEBIAN_FRONTEND=noninteractive \
-        && echo \"${PACKAGE_LIST}\" | tr ' ' '\n' | while read PKG; do \
-            echo \"Checking \$PKG...\" \
-            && if [ \"\$PKG\" != '' ] && dpkg -s \$PKG >/dev/null 2>&1; then apt-get install -yq --only-upgrade \$PKG; fi; \
-        done \
-        && apt-get autoremove -y \
-        && apt-get clean -y \
-        && rm -rf /var/lib/apt/lists/*"
+        GOVERSION=\"\$(go version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')\" \
+        && GOMINOR=\$(echo \$GOVERSION | grep -oE '\.[0-9]+\.' | tr -d '.') \
+        && GOFIX=\$(echo \$GOVERSION | grep -oE '\.[0-9]+$' | tr -d '.') \
+        && TARGETGO='none' \
+        && if [ \$GOMINOR = '14' ] && [ \$GOFIX -lt 14 ]; then TARGETGO=1.14.14; fi \
+        && if [ \$GOMINOR = '15' ] && [ \$GOFIX -lt 7 ]; then TARGETGO=1.15.7; fi \
+        && if [ \$TARGETGO != 'none' ]; then \
+            curl -sSL https://golang.org/dl/go\${TARGETGO}.linux-amd64.tar.gz -o /tmp/golang.tar.gz \
+            && tar -C /usr/local -xzf /tmp/golang.tar.gz \
+            && rm -f /tmp/golang.tar.gz; \
+        fi; \
+    fi"
+
+RUN echo "${PATCH_SCRIPT}" \
+    && if [ "$(id -u)" -ne 0 ]; then \
+        sudo bash -c "${PATCH_SCRIPT}"; \
+    else \
+        bash -c "${PATCH_SCRIPT}"; \
+    fi
